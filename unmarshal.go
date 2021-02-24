@@ -39,7 +39,7 @@ func (a app) unmarshalChan() chan message {
 	go func(ch chan message) {
 		var lines []string
 
-		i, n, limiter := 0, 300, true
+		i, n, limiter := 0, 600000, false
 		scanner := bufio.NewScanner(a.file)
 		for scanner.Scan() {
 			i++

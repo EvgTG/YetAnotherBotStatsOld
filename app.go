@@ -1,19 +1,15 @@
 package main
 
 import (
-	"YetAnotherBotStatsOld/go-config"
+	"fmt"
 	"os"
+	"time"
 )
 
 type app struct {
 	cfg  cfg
 	file *os.File
-}
-
-type cfg struct {
-	dir      string
-	filePath string
-	stage    int
+	rgx  *rgx
 }
 
 func (a app) Start() {
@@ -23,24 +19,14 @@ func (a app) Start() {
 	pnc(err)
 	defer a.file.Close()
 
+	tm := time.Now()
+
 	switch a.cfg.stage {
 	case 0: // тесты
 		a.stageTest()
+	case 1: // Голосования
+		a.stage1()
 	}
-}
 
-func pnc(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func NewCFG() (cfg cfg) {
-	configObj := config.New()
-
-	cfg.dir = configObj.GetString("DIR")
-	cfg.filePath = configObj.GetString("FILE")
-	cfg.stage = configObj.GetInt("STAGE")
-
-	return
+	fmt.Println("Обработано за ", time.Since(tm).String())
 }
