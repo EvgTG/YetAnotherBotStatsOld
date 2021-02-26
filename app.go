@@ -26,6 +26,8 @@ func (a app) Start() {
 		a.stageTest()
 	case 1: // Голосования
 		a.stage1()
+	case 2: // Обработка голосований, только после case1
+		a.stage2()
 	}
 
 	fmt.Println("Обработано за ", time.Since(tm).String())
