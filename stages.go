@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
-	//"github.com/vdobler/chart"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -19,18 +18,8 @@ func (a app) stageTest() {
 
 // Голосования
 func (a app) stage1() {
-	var err error
-
-	file, err := os.OpenFile(a.cfg.dir+"Polls/VotingResults.txt", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	pnc(err)
+	file := a.createFileNTrunc("Polls/VotingResults.txt")
 	defer file.Close()
-	stat, err := file.Stat()
-	pnc(err)
-
-	if stat.Size() > 0 {
-		err = file.Truncate(0)
-		pnc(err)
-	}
 
 	for msg := range a.unmarshalChan() {
 		if a.rgx.rgxVoteClose.MatchString(msg.Text) {
@@ -47,6 +36,11 @@ func (a app) stage2() {
 		question string
 		results  string
 		usersN   int
+	}
+
+	type pollsStat struct {
+		total                                   int
+		totalVotes, averageVotes, creatorsVotes int
 	}
 
 	rgxDate := regexp.MustCompile(`^[0-9]{4}\.[0-9]{2}\.[0-9]{2} [0-9]{2}\:[0-9]{2}`)
@@ -85,26 +79,50 @@ func (a app) stage2() {
 	}
 
 	var (
-		err      error
-		strSplit []string
-		strBytes []byte
-		polls    []poll
+		strSplit      []string
+		polls         []poll
+		pl            poll
+		plStat        pollsStat
+		creatorsMap   = make(map[string]int, 0)
+		creatorsSlice = make([]kv, 0)
+		file          *os.File
 	)
 
-	file, err := os.OpenFile(a.cfg.dir+"Polls/VotingResults.txt", os.O_RDWR, 0666)
-	pnc(err)
-	defer file.Close()
-	stat, err := file.Stat()
-	pnc(err)
-
-	stat.Size()
-	strBytes = make([]byte, stat.Size())
-	_, err = file.Read(strBytes)
-	strSplit = strings.Split(string(strBytes), "--------------------------------------------------\n")
+	//чтение файла
+	strSplit = strings.Split(a.readFile("Polls/VotingResults.txt"), "--------------------------------------------------\n")
 	strSplit = strSplit[1:]
 	polls = make([]poll, 0, len(strSplit))
 
+	//заполнение списка опросов и статистики
 	for i := range strSplit {
-		polls = append(polls, unmarshalPoll(strSplit[i]))
+		pl = unmarshalPoll(strSplit[i])
+
+		plStat.totalVotes += pl.usersN
+		creatorsMap[pl.creator]++
+
+		polls = append(polls, pl)
 	}
+
+	//топ создателей
+	creatorsMap = mapNickTransformation(creatorsMap)
+	file = a.createFileNTrunc("Polls/PollsCreators.txt")
+	creatorsSlice = mapSort(creatorsMap)
+	for _, v := range creatorsSlice {
+		file.WriteString(fmt.Sprintf("%3v %v\n", v.Value, v.Key))
+	}
+	file.Close()
+
+	//общая статистика
+	plStat.total = len(polls)
+	plStat.averageVotes = plStat.totalVotes / plStat.total
+	plStat.creatorsVotes = len(creatorsSlice)
+
+	fmt.Printf(
+		""+
+			"Всего опросов:%16v\n"+
+			"Всего голосов:%16v\n"+
+			"Голосов на опрос в среднем:%3v\n"+
+			"Создателей опросов:%11v\n\n",
+		plStat.total, plStat.totalVotes, plStat.averageVotes, plStat.creatorsVotes,
+	)
 }
