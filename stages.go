@@ -41,8 +41,10 @@ func (a app) stage2() {
 	}
 
 	type pollsStat struct {
-		total                                   int
-		totalVotes, averageVotes, creatorsVotes int
+		total                              int
+		totalVotes, maxVotes, averageVotes int
+		creatorsInc                        int
+		rocketInc                          int
 	}
 
 	rgxDate := regexp.MustCompile(`^[0-9]{4}\.[0-9]{2}\.[0-9]{2} [0-9]{2}\:[0-9]{2}`)
@@ -50,6 +52,7 @@ func (a app) stage2() {
 	rgxQuestion := regexp.MustCompile(`\n\n(.+голос\(а\), .+|.+%\(\d+\) - .+)\n`)
 	rgxResults := regexp.MustCompile(`\n\n`)
 	rgxUsersN := regexp.MustCompile(`^Всего проголосовало(|:) [0-9]{1,3}( юзер\(ов\)\.|)\n$`)
+	rgxRocket := regexp.MustCompile(`(Р|р)акет`)
 	//rgx := regexp.MustCompile(``)
 
 	nickCut := strings.NewReplacer("\n[Bot] Результаты голосования за вопрос ", "", "`", "", ":\n", "")
@@ -82,6 +85,7 @@ func (a app) stage2() {
 	}
 
 	var (
+		strFile       string
 		strSplit      []string
 		polls         []poll
 		pl            poll
@@ -89,10 +93,13 @@ func (a app) stage2() {
 		creatorsMap   = make(map[string]int, 0)
 		creatorsSlice = make([]kv, 0)
 		file          *os.File
+		chatWords     = []string{" чат", "YetAnotherBot"}
+		chatWordsStr  string
 	)
 
 	//чтение файла
-	strSplit = strings.Split(a.readFile("Polls/VotingResults.txt"), "--------------------------------------------------\n")
+	strFile = a.readFile("Polls/VotingResults.txt")
+	strSplit = strings.Split(strFile, "--------------------------------------------------\n")
 	strSplit = strSplit[1:]
 	polls = make([]poll, 0, len(strSplit))
 
@@ -102,6 +109,10 @@ func (a app) stage2() {
 
 		plStat.totalVotes += pl.usersN
 		creatorsMap[pl.creator]++
+
+		if inArray(pl.question, chatWords) {
+			chatWordsStr += fmt.Sprintf("--------------------------------------------------\n%v", pl.raw)
+		}
 
 		polls = append(polls, pl)
 	}
@@ -121,21 +132,30 @@ func (a app) stage2() {
 		return polls[i].usersN > polls[j].usersN
 	})
 	for i := 0; i < 30; i++ {
-		file.WriteString(fmt.Sprintf("%v. %v\n", i+1, polls[i].raw))
+		file.WriteString(fmt.Sprintf("--------------------------------------------------\n%v. %v\n", i+1, polls[i].raw))
 	}
+	file.Close()
+
+	//вопросы про чатик
+	file = a.createFileNTrunc("Polls/Chat.txt")
+	file.WriteString(chatWordsStr)
 	file.Close()
 
 	//общая статистика
 	plStat.total = len(polls)
 	plStat.averageVotes = plStat.totalVotes / plStat.total
-	plStat.creatorsVotes = len(creatorsSlice)
+	plStat.creatorsInc = len(creatorsSlice)
+	plStat.rocketInc = len(rgxRocket.FindAllString(strFile, -1))
+	plStat.maxVotes = polls[0].usersN
 
 	fmt.Printf(
 		""+
-			"Всего опросов:%16v\n"+
-			"Всего голосов:%16v\n"+
-			"Голосов на опрос в среднем:%3v\n"+
-			"Создателей опросов:%11v\n\n",
-		plStat.total, plStat.totalVotes, plStat.averageVotes, plStat.creatorsVotes,
+			"Всего опросов:%26v\n"+
+			"Всего голосов:%26v\n"+
+			"Максимум голосов в опросе:%14v\n"+
+			"Голосов на опрос в среднем:%13v\n"+
+			"Создателей опросов:%21v\n"+
+			"Упоминаний Ракеты:%22v",
+		plStat.total, plStat.totalVotes, plStat.maxVotes, plStat.averageVotes, plStat.creatorsInc, plStat.rocketInc,
 	)
 }

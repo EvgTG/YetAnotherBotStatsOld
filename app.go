@@ -30,5 +30,5 @@ func (a app) Start() {
 		a.stage2()
 	}
 
-	fmt.Println("Обработано за ", time.Since(tm).String())
+	fmt.Println("\n\nОбработано за ", time.Since(tm).String())
 }

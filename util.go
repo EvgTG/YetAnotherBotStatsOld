@@ -132,3 +132,12 @@ func mapNickTransformation(mp map[string]int) map[string]int {
 
 	return mp
 }
+
+func inArray(str string, array []string) bool {
+	for _, word := range array {
+		if strings.Contains(str, word) {
+			return true
+		}
+	}
+	return false
+}
