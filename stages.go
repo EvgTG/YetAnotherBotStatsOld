@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 
 	"regexp"
@@ -36,6 +37,7 @@ func (a app) stage2() {
 		question string
 		results  string
 		usersN   int
+		raw      string
 	}
 
 	type pollsStat struct {
@@ -54,6 +56,7 @@ func (a app) stage2() {
 	usersNCut := strings.NewReplacer("Всего проголосовало", "", ":", "", " ", "", "юзер(ов)", "", ".", "", "\n", "")
 
 	unmarshalPoll := func(str string) (p poll) {
+		p.raw = str
 		var err error
 		var index int
 
@@ -109,6 +112,16 @@ func (a app) stage2() {
 	creatorsSlice = mapSort(creatorsMap)
 	for _, v := range creatorsSlice {
 		file.WriteString(fmt.Sprintf("%3v %v\n", v.Value, v.Key))
+	}
+	file.Close()
+
+	//топ30 голосований по количеству проголосовавших
+	file = a.createFileNTrunc("Polls/PollsTop30.txt")
+	sort.Slice(polls, func(i, j int) bool {
+		return polls[i].usersN > polls[j].usersN
+	})
+	for i := 0; i < 30; i++ {
+		file.WriteString(fmt.Sprintf("%v. %v\n", i+1, polls[i].raw))
 	}
 	file.Close()
 
