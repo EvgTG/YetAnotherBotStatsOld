@@ -94,6 +94,13 @@ func mapSort(mp map[string]int) (ss []kv) {
 	return
 }
 
+func mapToSlice(mp map[string]int) (ss []kv) {
+	for k, v := range mp {
+		ss = append(ss, kv{k, v})
+	}
+	return
+}
+
 func mapSortByTime(mp map[string]int, timeLayout string) (ss []kv) {
 	for k, v := range mp {
 		ss = append(ss, kv{k, v})

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/vdobler/chart"
+	"image/color"
 	"os"
 	"sort"
 	"strconv"
@@ -193,23 +194,32 @@ func (a app) stage2() {
 
 	//графики
 	{
-		dumper := a.NewDumper("Polls/Charts", 1, 3, 2000, 500)
+		dumper := a.NewDumper("Polls/Charts", 1, 5, 2000, 500)
 		defer dumper.Close()
 
 		var (
+			charts = make([]chart.Chart, 0, dumper.N*dumper.M)
+			colors = []color.RGBA{ParseHexColor("#FF0000"), ParseHexColor("#0000FF")}
+
 			dataC1 = xy{make([]float64, 0), make([]float64, 0)}
 
-			dataC2P       = xy{make([]float64, 0), make([]float64, 0)}
-			dataC2IP      = xy{make([]float64, 0), make([]float64, 0)}
-			dataC2mapP    = make(map[string]int, 0)
-			dataC2mapIP   = make(map[string]int, 0)
-			dataC2sliceP  = make([]kv, 0)
-			dataC2sliceIP = make([]kv, 0)
+			dataC2P     = xy{make([]float64, 0), make([]float64, 0)}
+			dataC2IP    = xy{make([]float64, 0), make([]float64, 0)}
+			dataC2mapP  = make(map[string]int, 0)
+			dataC2mapIP = make(map[string]int, 0)
 
-			dataC3      = xy{make([]float64, 0), make([]float64, 0)}
-			dataC3map   = make(map[string]int, 0)
-			dataC3slice = make([]kv, 0)
-			charts      = make([]chart.Chart, 0, dumper.N*dumper.M)
+			dataC3    = xy{make([]float64, 0), make([]float64, 0)}
+			dataC3map = make(map[string]int, 0)
+
+			dataC4P     = xy{make([]float64, 0), make([]float64, 0)}
+			dataC4IP    = xy{make([]float64, 0), make([]float64, 0)}
+			dataC4mapP  = make(map[int]int, 0)
+			dataC4mapIP = make(map[int]int, 0)
+
+			dataC5P     = xy{make([]float64, 0), make([]float64, 0)}
+			dataC5IP    = xy{make([]float64, 0), make([]float64, 0)}
+			dataC5mapP  = make(map[time.Weekday]int, 0)
+			dataC5mapIP = make(map[time.Weekday]int, 0)
 		)
 
 		for _, pl := range polls {
@@ -219,9 +229,19 @@ func (a app) stage2() {
 			dataC2mapP[pl.date.Format("2006-01")]++
 
 			dataC3map[pl.date.Format("2006-01")] += pl.usersN
+
+			_, week := pl.date.ISOWeek()
+			dataC4mapP[week]++
+
+			dataC5mapP[pl.date.Weekday()+1]++
 		}
 		for _, ipl := range ipolls {
 			dataC2mapIP[ipl.date.Format("2006-01")]++
+
+			_, week := ipl.date.ISOWeek()
+			dataC4mapIP[week]++
+
+			dataC5mapIP[ipl.date.Weekday()+1]++
 		}
 
 		//время к колву проголосовавших (точки)
@@ -231,45 +251,76 @@ func (a app) stage2() {
 		c1.XRange.Time = true
 		c1.YRange.Label = "Кол-во голосов"
 		c1.AddDataPair("polls", dataC1.x, dataC1.y, chart.PlotStylePoints,
-			chart.Style{FillColor: ParseHexColor("#FF0000"), Symbol: 'o', LineWidth: 2})
+			chart.Style{FillColor: colors[0], Symbol: 'o', LineWidth: 2})
 		charts = append(charts, c1)
 
 		//время к колву опросов в месяц (столбцы)
-		dataC2sliceP = mapSortByTime(dataC2mapP, "2006-01")
-		dataC2sliceIP = mapSortByTime(dataC2mapIP, "2006-01")
-		for _, v := range dataC2sliceP {
-			tm, _ := time.Parse("2006-01", v.Key)
+		for k, v := range dataC2mapP {
+			tm, _ := time.Parse("2006-01", k)
 			dataC2P.x = append(dataC2P.x, float64(tm.Unix()))
-			dataC2P.y = append(dataC2P.y, float64(v.Value))
+			dataC2P.y = append(dataC2P.y, float64(v))
 		}
-		for _, v := range dataC2sliceIP {
-			tm, _ := time.Parse("2006-01", v.Key)
+		for k, v := range dataC2mapIP {
+			tm, _ := time.Parse("2006-01", k)
 			dataC2IP.x = append(dataC2IP.x, float64(tm.Unix()))
-			dataC2IP.y = append(dataC2IP.y, float64(v.Value))
+			dataC2IP.y = append(dataC2IP.y, float64(v))
 		}
 		c2 := &chart.BarChart{}
 		c2.Title = "Кол-во опросов в месяц"
 		c2.Key.Pos = "itl"
 		c2.XRange.Time = true
 		c2.YRange.Label = "Кол-во опросов"
-		c2.AddDataPair("Опросы", dataC2P.x, dataC2P.y, chart.Style{LineColor: ParseHexColor("#FF0000"), LineWidth: 2, FillColor: ParseHexColor("#FF0000")})
-		c2.AddDataPair("Инлайн опросы", dataC2IP.x, dataC2IP.y, chart.Style{LineColor: ParseHexColor("#0000FF"), LineWidth: 2, FillColor: ParseHexColor("#0000FF")})
+		c2.AddDataPair("Опросы", dataC2P.x, dataC2P.y, chart.Style{LineColor: colors[0], LineWidth: 2, FillColor: colors[0]})
+		c2.AddDataPair("Инлайн опросы", dataC2IP.x, dataC2IP.y, chart.Style{LineColor: colors[1], LineWidth: 2, FillColor: colors[1]})
 		charts = append(charts, c2)
 
 		//время к колву голосов в месяц (столбцы)
-		dataC3slice = mapSortByTime(dataC3map, "2006-01")
-		for _, v := range dataC3slice {
-			tm, _ := time.Parse("2006-01", v.Key)
+		for k, v := range dataC3map {
+			tm, _ := time.Parse("2006-01", k)
 			dataC3.x = append(dataC3.x, float64(tm.Unix()))
-			dataC3.y = append(dataC3.y, float64(v.Value))
+			dataC3.y = append(dataC3.y, float64(v))
 		}
 		c3 := &chart.BarChart{}
 		c3.Title = "Кол-во голосов в месяц"
 		c3.Key.Hide = true
 		c3.XRange.Time = true
 		c3.YRange.Label = "Кол-во голосов"
-		c3.AddDataPair("polls", dataC3.x, dataC3.y, chart.Style{LineColor: ParseHexColor("#FF0000"), LineWidth: 3, FillColor: ParseHexColor("#FF0000")})
+		c3.AddDataPair("polls", dataC3.x, dataC3.y, chart.Style{LineColor: colors[0], LineWidth: 3, FillColor: colors[0]})
 		charts = append(charts, c3)
+
+		//активность в год (столбцы)
+		for k, v := range dataC4mapP {
+			dataC4P.x = append(dataC4P.x, float64(k))
+			dataC4P.y = append(dataC4P.y, float64(v))
+		}
+		for k, v := range dataC4mapIP {
+			dataC4IP.x = append(dataC4IP.x, float64(k))
+			dataC4IP.y = append(dataC4IP.y, float64(v))
+		}
+		c4 := &chart.BarChart{}
+		c4.Title = "Годовая активность (не средняя, а суммарная), столбик - неделя"
+		c4.Key.Pos = "itr"
+		c4.YRange.Label = "Кол-во опросов"
+		c4.AddDataPair("Опросы", dataC4P.x, dataC4P.y, chart.Style{LineColor: colors[0], LineWidth: 2, FillColor: colors[0]})
+		c4.AddDataPair("Инлайн опросы", dataC4IP.x, dataC4IP.y, chart.Style{LineColor: colors[1], LineWidth: 2, FillColor: colors[1]})
+		charts = append(charts, c4)
+
+		//активность в год (столбцы)
+		for k, v := range dataC5mapP {
+			dataC5P.x = append(dataC5P.x, float64(k))
+			dataC5P.y = append(dataC5P.y, float64(v))
+		}
+		for k, v := range dataC5mapIP {
+			dataC5IP.x = append(dataC5IP.x, float64(k))
+			dataC5IP.y = append(dataC5IP.y, float64(v))
+		}
+		c5 := &chart.BarChart{}
+		c5.Title = "Недельная активность (не средняя, а суммарная), столбик - день"
+		c5.Key.Pos = "itl"
+		c5.YRange.Label = "Кол-во опросов"
+		c5.AddDataPair("Опросы", dataC5P.x, dataC5P.y, chart.Style{LineColor: colors[0], LineWidth: 2, FillColor: colors[0]})
+		c5.AddDataPair("Инлайн опросы", dataC5IP.x, dataC5IP.y, chart.Style{LineColor: colors[1], LineWidth: 2, FillColor: colors[1]})
+		charts = append(charts, c5)
 
 		//рисовка
 		for _, c := range charts {
