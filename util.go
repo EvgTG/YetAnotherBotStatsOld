@@ -2,19 +2,27 @@ package main
 
 import (
 	"YetAnotherBotStatsOld/go-config"
+	"fmt"
+	"github.com/vdobler/chart"
+	"github.com/vdobler/chart/imgg"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 type rgx struct {
-	rgxVoteClose *regexp.Regexp
+	rgxPollClose *regexp.Regexp
 }
 
 func NewRegexp() *rgx {
 	return &rgx{
-		rgxVoteClose: regexp.MustCompile(`^\[Bot\] Результаты голосования за вопрос`),
+		rgxPollClose: regexp.MustCompile(`^\[Bot\] Результаты голосования за вопрос`),
 	}
 }
 
@@ -84,6 +92,20 @@ func mapSort(mp map[string]int) (ss []kv) {
 	return
 }
 
+func mapSortByTime(mp map[string]int, timeLayout string) (ss []kv) {
+	for k, v := range mp {
+		ss = append(ss, kv{k, v})
+	}
+
+	sort.Slice(ss, func(i, j int) bool {
+		tmi, _ := time.Parse(timeLayout, ss[i].Key)
+		tmj, _ := time.Parse(timeLayout, ss[j].Key)
+		return tmi.Unix() < tmj.Unix()
+	})
+
+	return
+}
+
 // Объединяет ники по id
 // На вход стринги с "#ADFL 🍕Pizza".
 func mapNickTransformation(mp map[string]int) map[string]int {
@@ -140,4 +162,68 @@ func inArray(str string, array []string) bool {
 		}
 	}
 	return false
+}
+
+func kvToStr(kv []kv) (strRet []string) {
+	for _, k := range kv {
+		strRet = append(strRet, k.Key)
+	}
+	return
+}
+
+type xy struct {
+	x, y []float64
+}
+
+type Dumper struct {
+	N, M, W, H, Cnt int
+	I               *image.RGBA
+	imgFile         *os.File
+}
+
+func (a app) NewDumper(name string, n, m, w, h int) *Dumper {
+	var err error
+	dumper := Dumper{N: n, M: m, W: w, H: h}
+
+	dumper.imgFile, err = os.Create(a.cfg.dir + name + ".png")
+	if err != nil {
+		panic(err)
+	}
+	dumper.I = image.NewRGBA(image.Rect(0, 0, n*w, m*h))
+	bg := image.NewUniform(color.RGBA{0xff, 0xff, 0xff, 0xff})
+	draw.Draw(dumper.I, dumper.I.Bounds(), bg, image.ZP, draw.Src)
+
+	return &dumper
+}
+
+func (d *Dumper) Close() {
+	png.Encode(d.imgFile, d.I)
+	d.imgFile.Close()
+}
+
+func (d *Dumper) Plot(c chart.Chart) {
+	row, col := d.Cnt/d.N, d.Cnt%d.N
+
+	igr := imgg.AddTo(d.I, col*d.W, row*d.H, d.W, d.H, color.RGBA{0xff, 0xff, 0xff, 0xff}, nil, nil)
+	c.Plot(igr)
+
+	d.Cnt++
+}
+
+func ParseHexColor(s string) (c color.RGBA) {
+	var err error
+	c.A = 0xff
+	switch len(s) {
+	case 7:
+		_, err = fmt.Sscanf(s, "#%02x%02x%02x", &c.R, &c.G, &c.B)
+	case 4:
+		_, err = fmt.Sscanf(s, "#%1x%1x%1x", &c.R, &c.G, &c.B)
+		c.R *= 17
+		c.G *= 17
+		c.B *= 17
+	default:
+		err = fmt.Errorf("invalid length, must be 7 or 4")
+	}
+	pnc(err)
+	return
 }

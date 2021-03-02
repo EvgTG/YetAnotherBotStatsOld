@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/vdobler/chart"
 	"os"
 	"sort"
 	"strconv"
@@ -23,7 +24,7 @@ func (a app) stage1() {
 	defer file.Close()
 
 	for msg := range a.unmarshalChan() {
-		if a.rgx.rgxVoteClose.MatchString(msg.Text) {
+		if a.rgx.rgxPollClose.MatchString(msg.Text) {
 			file.WriteString(fmt.Sprintf("--------------------------------------------------\n%v\n%v\n", msg.Date.Format("2006.01.02 15:04"), msg.Text))
 		}
 	}
@@ -125,6 +126,77 @@ func (a app) stage2() {
 		file.WriteString(fmt.Sprintf("%3v %v\n", v.Value, v.Key))
 	}
 	file.Close()
+
+	//графики
+	{
+		dumper := a.NewDumper("Polls/Charts", 1, 3, 2000, 500)
+		defer dumper.Close()
+
+		var (
+			dataC1      = xy{make([]float64, 0), make([]float64, 0)}
+			dataC2      = xy{make([]float64, 0), make([]float64, 0)}
+			dataC3      = xy{make([]float64, 0), make([]float64, 0)}
+			dataC2map   = make(map[string]int, 0)
+			dataC2slice = make([]kv, 0)
+			dataC3map   = make(map[string]int, 0)
+			dataC3slice = make([]kv, 0)
+			charts      = make([]chart.Chart, 0, dumper.N*dumper.M)
+		)
+
+		for _, pl := range polls {
+			dataC1.x = append(dataC1.x, float64(pl.date.Unix()))
+			dataC1.y = append(dataC1.y, float64(pl.usersN))
+
+			dataC2map[pl.date.Format("2006-01")]++
+			dataC3map[pl.date.Format("2006-01")] += pl.usersN
+		}
+
+		//время к колву проголосовавших (точки)
+		c1 := &chart.ScatterChart{}
+		c1.Title = "Все опросы"
+		c1.Key.Hide = true
+		c1.XRange.Time = true
+		c1.YRange.Label = "Кол-во голосов"
+		c1.AddDataPair("polls", dataC1.x, dataC1.y, chart.PlotStylePoints,
+			chart.Style{FillColor: ParseHexColor("#FF5733"), Symbol: 'o', LineWidth: 2})
+		charts = append(charts, c1)
+
+		//время к колву опросов (по месяцам)
+		dataC2slice = mapSortByTime(dataC2map, "2006-01")
+		for _, v := range dataC2slice {
+			tm, _ := time.Parse("2006-01", v.Key)
+			dataC2.x = append(dataC2.x, float64(tm.Unix()))
+			dataC2.y = append(dataC2.y, float64(v.Value))
+		}
+		c2 := &chart.BarChart{}
+		c2.Title = "Кол-во опросов в месяц"
+		c2.Key.Hide = true
+		c2.XRange.Time = true
+		c2.YRange.Label = "Кол-во опросов"
+		c2.AddDataPair("polls", dataC2.x, dataC2.y, chart.Style{LineColor: ParseHexColor("#FF5733"), LineWidth: 3, FillColor: ParseHexColor("#FF5733")})
+		charts = append(charts, c2)
+
+		//время к колву голосов (по месяцам)
+		dataC3slice = mapSortByTime(dataC3map, "2006-01")
+		for _, v := range dataC3slice {
+			tm, _ := time.Parse("2006-01", v.Key)
+			dataC3.x = append(dataC3.x, float64(tm.Unix()))
+			dataC3.y = append(dataC3.y, float64(v.Value))
+		}
+		c3 := &chart.BarChart{}
+		c3.Title = "Кол-во голосов в месяц"
+		c3.Key.Hide = true
+		c3.XRange.Time = true
+		c3.YRange.Label = "Кол-во голосов"
+		c3.AddDataPair("polls", dataC3.x, dataC3.y, chart.Style{LineColor: ParseHexColor("#FF5733"), LineWidth: 3, FillColor: ParseHexColor("#FF5733")})
+		charts = append(charts, c3)
+
+		//рисовка
+		for _, c := range charts {
+			dumper.Plot(c)
+			c.Reset()
+		}
+	}
 
 	//топ30 голосований по количеству проголосовавших
 	file = a.createFileNTrunc("Polls/PollsTop30.txt")
