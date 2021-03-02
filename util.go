@@ -18,11 +18,13 @@ import (
 
 type rgx struct {
 	rgxPollClose *regexp.Regexp
+	rgxIPoll     *regexp.Regexp
 }
 
 func NewRegexp() *rgx {
 	return &rgx{
 		rgxPollClose: regexp.MustCompile(`^\[Bot\] Результаты голосования за вопрос`),
+		rgxIPoll:     regexp.MustCompile(`^\[Bot\] #.+ поставил\(а\) вопрос:\n`),
 	}
 }
 
