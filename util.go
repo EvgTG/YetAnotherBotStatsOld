@@ -166,6 +166,15 @@ func mapNickTransformation(mp map[string]int) map[string]int {
 
 func inArray(str string, array []string) bool {
 	for _, word := range array {
+		if str == word {
+			return true
+		}
+	}
+	return false
+}
+
+func inArrayContains(str string, array []string) bool {
+	for _, word := range array {
 		if strings.Contains(str, word) {
 			return true
 		}

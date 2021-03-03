@@ -160,7 +160,7 @@ func (a app) stage2() {
 		plStat.totalVotes += pl.usersN
 		creatorsMapP[pl.creator]++
 
-		if inArray(pl.question, chatWords) {
+		if inArrayContains(pl.question, chatWords) {
 			chatWordsStr += fmt.Sprintf("--------------------------------------------------\n%v", pl.raw)
 		}
 
