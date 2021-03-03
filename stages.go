@@ -373,3 +373,46 @@ func (a app) stage2() {
 		plStat.rocketInc,
 	)
 }
+
+//анализ слов
+/*
+//анализ слов
+	textCut := strings.NewReplacer(" голос(а), ", "", " - ", "", "️⃣ ", "", "⃣", "", "ё", "е")
+	textCut2 := strings.NewReplacer("\n", " ")
+	textCut3 := strings.NewReplacer("  ", " ", "   ", " ", "    ", " ", "     ", " ")
+	rgxSymbol := regexp.MustCompile(`(\p{P}|\d)`)
+	ignoreWords := strings.Split("не и ли а бы или без из в вокруг в у с до над при для за к между на о об около от перед под по про с из-за я меня мне мной обо мне ты тебя тебе тобой он оно его ему его им нем она ее ей ее ею ней мы нас нам нами вы вас вам вами они их им ими них", " ")
+
+	for _, pl := range polls {
+		text += pl.question + "\n" + pl.results + "\n"
+	}
+	for _, ipl := range ipolls {
+		text += ipl.question + "\n" + ipl.variants + "\n"
+	}
+
+	text = textCut.Replace(text)
+	text = rgxSymbol.ReplaceAllLiteralString(text, "")
+	text = textCut2.Replace(text)
+	text = textCut3.Replace(text)
+	text = strings.ToLower(text)
+	for _, s := range strings.Split(text, " ") {
+		if s != "" {
+			textWords[s]++
+		}
+	}
+	i := 0
+	for _, v := range mapSort(textWords) {
+		if inArray(v.Key, ignoreWords) {
+			continue
+		}
+		if i == 50 {
+			break
+		}
+		i++
+		textOut += fmt.Sprintf("%2v %3v %v\n", i+1, v.Value, v.Key)
+	}
+
+	file = a.createFileNTrunc("Polls/Words.txt")
+	file.WriteString(textOut)
+	file.Close()
+*/
