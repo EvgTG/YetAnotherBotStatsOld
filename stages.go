@@ -196,10 +196,36 @@ func (a app) stage2() {
 	{
 		dumper := a.NewDumper("Polls/Charts", 1, 5, 2000, 500)
 		defer dumper.Close()
+		dumper2 := a.NewDumper("Polls/CreatorsChart", 1, 2, 700, 500)
+		defer dumper2.Close()
 
 		var (
-			charts = make([]chart.Chart, 0, dumper.N*dumper.M)
-			colors = []color.RGBA{ParseHexColor("#FF0000"), ParseHexColor("#0000FF")}
+			charts  = make([]chart.Chart, 0, dumper.N*dumper.M)
+			charts2 = make([]chart.Chart, 0, dumper2.N*dumper2.M)
+			colors  = []color.RGBA{ParseHexColor("#FF0000"), ParseHexColor("#0000FF")}
+			colors2 = []color.RGBA{
+				ParseHexColor("#000000"),
+				ParseHexColor("#E53935"),
+				ParseHexColor("#D81B60"),
+				ParseHexColor("#8E24AA"),
+				ParseHexColor("#5E35B1"),
+				ParseHexColor("#3949AB"),
+				ParseHexColor("#1E88E5"),
+				ParseHexColor("#039BE5"),
+				ParseHexColor("#00ACC1"),
+				ParseHexColor("#00897B"),
+				ParseHexColor("#43A047"),
+				ParseHexColor("#7CB342"),
+				ParseHexColor("#C0CA33"),
+				ParseHexColor("#FDD835"),
+				ParseHexColor("#FFB300"),
+				ParseHexColor("#FB8C00"),
+				ParseHexColor("#F4511E"),
+				ParseHexColor("#6D4C41"),
+				ParseHexColor("#757575"),
+				ParseHexColor("#546E7A"),
+				ParseHexColor("#D0D3D4"),
+			}
 
 			dataC1 = xy{make([]float64, 0), make([]float64, 0)}
 
@@ -220,6 +246,13 @@ func (a app) stage2() {
 			dataC5IP    = xy{make([]float64, 0), make([]float64, 0)}
 			dataC5mapP  = make(map[time.Weekday]int, 0)
 			dataC5mapIP = make(map[time.Weekday]int, 0)
+
+			sum         int
+			dataC6      = make([]chart.CatValue, 0)
+			dataC6Style = make([]chart.Style, 0)
+
+			dataC7      = make([]chart.CatValue, 0)
+			dataC7Style = make([]chart.Style, 0)
 		)
 
 		for _, pl := range polls {
@@ -322,9 +355,63 @@ func (a app) stage2() {
 		c5.AddDataPair("Инлайн опросы", dataC5IP.x, dataC5IP.y, chart.Style{LineColor: colors[1], LineWidth: 2, FillColor: colors[1]})
 		charts = append(charts, c5)
 
+		//топ создателей опросов
+		c6 := &chart.PieChart{}
+		sum = 0
+		for i, v := range creatorsSliceP {
+			if i == 10 {
+				break
+			}
+			dataC6 = append(dataC6, chart.CatValue{
+				Cat: fmt.Sprintf("%4.3v%% %v", float64(v.Value)/float64(len(polls))*100, v.Key[:strings.Index(v.Key, " ")]),
+				Val: float64(v.Value),
+			})
+			dataC6Style = append(dataC6Style, chart.Style{LineColor: colors2[0], LineWidth: 0, FillColor: colors2[i+1]})
+			sum += v.Value
+		}
+		dataC6 = append(dataC6, chart.CatValue{
+			Cat: fmt.Sprintf("%4.3v%% %v", float64(float64(len(polls)-sum))/float64(len(polls))*100, "Остальные"),
+			Val: float64(len(polls) - sum),
+		})
+		dataC6Style = append(dataC6Style, chart.Style{LineColor: colors2[0], LineWidth: 1, FillColor: colors2[len(colors2)-1]})
+		c6.Key.Pos = "ort"
+		c6.Key.Border = -1
+		c6.Title = "Топ 10 создателей опросов"
+		c6.AddData("Создатели", dataC6, dataC6Style)
+		charts2 = append(charts2, c6)
+
+		//топ создателей инлайн опросов
+		c7 := &chart.PieChart{}
+		sum = 0
+		for i, v := range creatorsSliceIP {
+			if i == 15 {
+				break
+			}
+			dataC7 = append(dataC7, chart.CatValue{
+				Cat: fmt.Sprintf("%4.3v%% %v", float64(v.Value)/float64(len(ipolls))*100, v.Key[:strings.Index(v.Key, " ")]),
+				Val: float64(v.Value),
+			})
+			dataC7Style = append(dataC7Style, chart.Style{LineColor: colors2[0], LineWidth: 0, FillColor: colors2[i+1]})
+			sum += v.Value
+		}
+		dataC7 = append(dataC7, chart.CatValue{
+			Cat: fmt.Sprintf("%4.3v%% %v", float64(float64(len(ipolls)-sum))/float64(len(ipolls))*100, "Остальные"),
+			Val: float64(len(ipolls) - sum),
+		})
+		dataC7Style = append(dataC7Style, chart.Style{LineColor: colors2[0], LineWidth: 1, FillColor: colors2[len(colors2)-1]})
+		c7.Key.Pos = "ort"
+		c7.Key.Border = -1
+		c7.Title = "Топ 15 создателей инлайн опросов"
+		c7.AddData("Создатели", dataC7, dataC7Style)
+		charts2 = append(charts2, c7)
+
 		//рисовка
 		for _, c := range charts {
 			dumper.Plot(c)
+			c.Reset()
+		}
+		for _, c := range charts2 {
+			dumper2.Plot(c)
 			c.Reset()
 		}
 	}

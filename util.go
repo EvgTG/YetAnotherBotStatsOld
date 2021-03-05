@@ -161,6 +161,38 @@ func mapNickTransformation(mp map[string]int) map[string]int {
 		}
 	}
 
+	//Костыль от дырыча на опросы 🙄🙄🙄🙄🙄🙄🙄
+	if true {
+		brk := false
+		for k1, v1 := range mp {
+			if brk {
+				break
+			}
+
+			id1 = k1[:strings.Index(k1, " ")]
+			nick1 = k1[strings.Index(k1, " ")+1:]
+
+			if id1 == "#VQ" {
+				for k2, v2 := range mp {
+					if brk {
+						break
+					}
+
+					id2 = k2[:strings.Index(k2, " ")]
+					nick2 = k2[strings.Index(k2, " ")+1:]
+
+					if id2 == "#ohyoutouchmytralala" {
+						mp[id1+" "+nick1+"/"+nick2] = v1 + v2
+						delete(mp, k1)
+						delete(mp, k2)
+
+						brk = true
+					}
+				}
+			}
+		}
+	}
+
 	return mp
 }
 
