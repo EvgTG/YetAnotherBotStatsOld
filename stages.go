@@ -2,8 +2,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/go-echarts/go-echarts/v2/charts"
+	"github.com/go-echarts/go-echarts/v2/components"
+	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/vdobler/chart"
 	"image/color"
+	"io"
 	"os"
 	"sort"
 	"strconv"
@@ -196,68 +200,34 @@ func (a app) stage2() {
 	{
 		dumper := a.NewDumper("Polls/Charts", 1, 5, 2000, 500)
 		defer dumper.Close()
-		dumper2 := a.NewDumper("Polls/CreatorsChart", 1, 2, 700, 500)
-		defer dumper2.Close()
 
 		var (
-			charts  = make([]chart.Chart, 0, dumper.N*dumper.M)
-			charts2 = make([]chart.Chart, 0, dumper2.N*dumper2.M)
-			colors  = []color.RGBA{ParseHexColor("#FF0000"), ParseHexColor("#0000FF")}
-			colors2 = []color.RGBA{
-				ParseHexColor("#000000"),
-				ParseHexColor("#E53935"),
-				ParseHexColor("#D81B60"),
-				ParseHexColor("#8E24AA"),
-				ParseHexColor("#5E35B1"),
-				ParseHexColor("#3949AB"),
-				ParseHexColor("#1E88E5"),
-				ParseHexColor("#039BE5"),
-				ParseHexColor("#00ACC1"),
-				ParseHexColor("#00897B"),
-				ParseHexColor("#43A047"),
-				ParseHexColor("#7CB342"),
-				ParseHexColor("#C0CA33"),
-				ParseHexColor("#FDD835"),
-				ParseHexColor("#FFB300"),
-				ParseHexColor("#FB8C00"),
-				ParseHexColor("#F4511E"),
-				ParseHexColor("#6D4C41"),
-				ParseHexColor("#757575"),
-				ParseHexColor("#546E7A"),
-				ParseHexColor("#D0D3D4"),
-			}
+			chartsSlice = make([]chart.Chart, 0, dumper.N*dumper.M)
+			colors      = []color.RGBA{ParseHexColor("#FF0000"), ParseHexColor("#0000FF")}
 
-			dataC1 = xy{make([]float64, 0), make([]float64, 0)}
+			dataP  = &xy{make([]float64, 0, 0), make([]float64, 0, 0)}
+			dataIP = &xy{make([]float64, 0, 0), make([]float64, 0, 0)}
+			//Не забывать обнулять - resetData()
 
-			dataC2P     = xy{make([]float64, 0), make([]float64, 0)}
-			dataC2IP    = xy{make([]float64, 0), make([]float64, 0)}
 			dataC2mapP  = make(map[string]int, 0)
 			dataC2mapIP = make(map[string]int, 0)
 
-			dataC3    = xy{make([]float64, 0), make([]float64, 0)}
 			dataC3map = make(map[string]int, 0)
 
-			dataC4P     = xy{make([]float64, 0), make([]float64, 0)}
-			dataC4IP    = xy{make([]float64, 0), make([]float64, 0)}
 			dataC4mapP  = make(map[int]int, 0)
 			dataC4mapIP = make(map[int]int, 0)
 
-			dataC5P     = xy{make([]float64, 0), make([]float64, 0)}
-			dataC5IP    = xy{make([]float64, 0), make([]float64, 0)}
 			dataC5mapP  = make(map[time.Weekday]int, 0)
 			dataC5mapIP = make(map[time.Weekday]int, 0)
-
-			sum         int
-			dataC6      = make([]chart.CatValue, 0)
-			dataC6Style = make([]chart.Style, 0)
-
-			dataC7      = make([]chart.CatValue, 0)
-			dataC7Style = make([]chart.Style, 0)
 		)
+		resetData := func() {
+			dataP = &xy{make([]float64, 0, 0), make([]float64, 0, 0)}
+			dataIP = &xy{make([]float64, 0, 0), make([]float64, 0, 0)}
+		}
 
 		for _, pl := range polls {
-			dataC1.x = append(dataC1.x, float64(pl.date.Unix()))
-			dataC1.y = append(dataC1.y, float64(pl.usersN))
+			dataP.x = append(dataP.x, float64(pl.date.Unix()))
+			dataP.y = append(dataP.y, float64(pl.usersN))
 
 			dataC2mapP[pl.date.Format("2006-01")]++
 
@@ -283,135 +253,86 @@ func (a app) stage2() {
 		c1.Key.Hide = true
 		c1.XRange.Time = true
 		c1.YRange.Label = "Кол-во голосов"
-		c1.AddDataPair("polls", dataC1.x, dataC1.y, chart.PlotStylePoints,
+		c1.AddDataPair("polls", dataP.x, dataP.y, chart.PlotStylePoints,
 			chart.Style{FillColor: colors[0], Symbol: 'o', LineWidth: 2})
-		charts = append(charts, c1)
+		chartsSlice = append(chartsSlice, c1)
+		resetData()
 
 		//время к колву опросов в месяц (столбцы)
 		for k, v := range dataC2mapP {
 			tm, _ := time.Parse("2006-01", k)
-			dataC2P.x = append(dataC2P.x, float64(tm.Unix()))
-			dataC2P.y = append(dataC2P.y, float64(v))
+			dataP.x = append(dataP.x, float64(tm.Unix()))
+			dataP.y = append(dataP.y, float64(v))
 		}
 		for k, v := range dataC2mapIP {
 			tm, _ := time.Parse("2006-01", k)
-			dataC2IP.x = append(dataC2IP.x, float64(tm.Unix()))
-			dataC2IP.y = append(dataC2IP.y, float64(v))
+			dataIP.x = append(dataIP.x, float64(tm.Unix()))
+			dataIP.y = append(dataIP.y, float64(v))
 		}
 		c2 := &chart.BarChart{}
 		c2.Title = "Кол-во опросов в месяц"
 		c2.Key.Pos = "itl"
 		c2.XRange.Time = true
 		c2.YRange.Label = "Кол-во опросов"
-		c2.AddDataPair("Опросы", dataC2P.x, dataC2P.y, chart.Style{LineColor: colors[0], LineWidth: 2, FillColor: colors[0]})
-		c2.AddDataPair("Инлайн опросы", dataC2IP.x, dataC2IP.y, chart.Style{LineColor: colors[1], LineWidth: 2, FillColor: colors[1]})
-		charts = append(charts, c2)
+		c2.AddDataPair("Опросы", dataP.x, dataP.y, chart.Style{LineColor: colors[0], LineWidth: 2, FillColor: colors[0]})
+		c2.AddDataPair("Инлайн опросы", dataIP.x, dataIP.y, chart.Style{LineColor: colors[1], LineWidth: 2, FillColor: colors[1]})
+		chartsSlice = append(chartsSlice, c2)
+		resetData()
 
 		//время к колву голосов в месяц (столбцы)
 		for k, v := range dataC3map {
 			tm, _ := time.Parse("2006-01", k)
-			dataC3.x = append(dataC3.x, float64(tm.Unix()))
-			dataC3.y = append(dataC3.y, float64(v))
+			dataP.x = append(dataP.x, float64(tm.Unix()))
+			dataP.y = append(dataP.y, float64(v))
 		}
 		c3 := &chart.BarChart{}
 		c3.Title = "Кол-во голосов в месяц"
 		c3.Key.Hide = true
 		c3.XRange.Time = true
 		c3.YRange.Label = "Кол-во голосов"
-		c3.AddDataPair("polls", dataC3.x, dataC3.y, chart.Style{LineColor: colors[0], LineWidth: 3, FillColor: colors[0]})
-		charts = append(charts, c3)
+		c3.AddDataPair("polls", dataP.x, dataP.y, chart.Style{LineColor: colors[0], LineWidth: 3, FillColor: colors[0]})
+		chartsSlice = append(chartsSlice, c3)
+		resetData()
 
 		//активность в год (столбцы)
 		for k, v := range dataC4mapP {
-			dataC4P.x = append(dataC4P.x, float64(k))
-			dataC4P.y = append(dataC4P.y, float64(v))
+			dataP.x = append(dataP.x, float64(k))
+			dataP.y = append(dataP.y, float64(v))
 		}
 		for k, v := range dataC4mapIP {
-			dataC4IP.x = append(dataC4IP.x, float64(k))
-			dataC4IP.y = append(dataC4IP.y, float64(v))
+			dataIP.x = append(dataIP.x, float64(k))
+			dataIP.y = append(dataIP.y, float64(v))
 		}
 		c4 := &chart.BarChart{}
 		c4.Title = "Годовая активность (не средняя, а суммарная), столбик - неделя"
 		c4.Key.Pos = "itr"
 		c4.YRange.Label = "Кол-во опросов"
-		c4.AddDataPair("Опросы", dataC4P.x, dataC4P.y, chart.Style{LineColor: colors[0], LineWidth: 2, FillColor: colors[0]})
-		c4.AddDataPair("Инлайн опросы", dataC4IP.x, dataC4IP.y, chart.Style{LineColor: colors[1], LineWidth: 2, FillColor: colors[1]})
-		charts = append(charts, c4)
+		c4.AddDataPair("Опросы", dataP.x, dataP.y, chart.Style{LineColor: colors[0], LineWidth: 2, FillColor: colors[0]})
+		c4.AddDataPair("Инлайн опросы", dataIP.x, dataIP.y, chart.Style{LineColor: colors[1], LineWidth: 2, FillColor: colors[1]})
+		chartsSlice = append(chartsSlice, c4)
+		resetData()
 
 		//активность в год (столбцы)
 		for k, v := range dataC5mapP {
-			dataC5P.x = append(dataC5P.x, float64(k))
-			dataC5P.y = append(dataC5P.y, float64(v))
+			dataP.x = append(dataP.x, float64(k))
+			dataP.y = append(dataP.y, float64(v))
 		}
 		for k, v := range dataC5mapIP {
-			dataC5IP.x = append(dataC5IP.x, float64(k))
-			dataC5IP.y = append(dataC5IP.y, float64(v))
+			dataIP.x = append(dataIP.x, float64(k))
+			dataIP.y = append(dataIP.y, float64(v))
 		}
 		c5 := &chart.BarChart{}
 		c5.Title = "Недельная активность (не средняя, а суммарная), столбик - день"
 		c5.Key.Pos = "itl"
 		c5.YRange.Label = "Кол-во опросов"
-		c5.AddDataPair("Опросы", dataC5P.x, dataC5P.y, chart.Style{LineColor: colors[0], LineWidth: 2, FillColor: colors[0]})
-		c5.AddDataPair("Инлайн опросы", dataC5IP.x, dataC5IP.y, chart.Style{LineColor: colors[1], LineWidth: 2, FillColor: colors[1]})
-		charts = append(charts, c5)
+		c5.AddDataPair("Опросы", dataP.x, dataP.y, chart.Style{LineColor: colors[0], LineWidth: 2, FillColor: colors[0]})
+		c5.AddDataPair("Инлайн опросы", dataIP.x, dataIP.y, chart.Style{LineColor: colors[1], LineWidth: 2, FillColor: colors[1]})
+		chartsSlice = append(chartsSlice, c5)
+		resetData()
 
-		//топ создателей опросов
-		c6 := &chart.PieChart{}
-		sum = 0
-		for i, v := range creatorsSliceP {
-			if i == 10 {
-				break
-			}
-			dataC6 = append(dataC6, chart.CatValue{
-				Cat: fmt.Sprintf("%4.3v%% %v", float64(v.Value)/float64(len(polls))*100, v.Key[:strings.Index(v.Key, " ")]),
-				Val: float64(v.Value),
-			})
-			dataC6Style = append(dataC6Style, chart.Style{LineColor: colors2[0], LineWidth: 0, FillColor: colors2[i+1]})
-			sum += v.Value
-		}
-		dataC6 = append(dataC6, chart.CatValue{
-			Cat: fmt.Sprintf("%4.3v%% %v", float64(float64(len(polls)-sum))/float64(len(polls))*100, "Остальные"),
-			Val: float64(len(polls) - sum),
-		})
-		dataC6Style = append(dataC6Style, chart.Style{LineColor: colors2[0], LineWidth: 1, FillColor: colors2[len(colors2)-1]})
-		c6.Key.Pos = "ort"
-		c6.Key.Border = -1
-		c6.Title = "Топ 10 создателей опросов"
-		c6.AddData("Создатели", dataC6, dataC6Style)
-		charts2 = append(charts2, c6)
-
-		//топ создателей инлайн опросов
-		c7 := &chart.PieChart{}
-		sum = 0
-		for i, v := range creatorsSliceIP {
-			if i == 15 {
-				break
-			}
-			dataC7 = append(dataC7, chart.CatValue{
-				Cat: fmt.Sprintf("%4.3v%% %v", float64(v.Value)/float64(len(ipolls))*100, v.Key[:strings.Index(v.Key, " ")]),
-				Val: float64(v.Value),
-			})
-			dataC7Style = append(dataC7Style, chart.Style{LineColor: colors2[0], LineWidth: 0, FillColor: colors2[i+1]})
-			sum += v.Value
-		}
-		dataC7 = append(dataC7, chart.CatValue{
-			Cat: fmt.Sprintf("%4.3v%% %v", float64(float64(len(ipolls)-sum))/float64(len(ipolls))*100, "Остальные"),
-			Val: float64(len(ipolls) - sum),
-		})
-		dataC7Style = append(dataC7Style, chart.Style{LineColor: colors2[0], LineWidth: 1, FillColor: colors2[len(colors2)-1]})
-		c7.Key.Pos = "ort"
-		c7.Key.Border = -1
-		c7.Title = "Топ 15 создателей инлайн опросов"
-		c7.AddData("Создатели", dataC7, dataC7Style)
-		charts2 = append(charts2, c7)
-
-		//рисовка
-		for _, c := range charts {
+		//рисовка/ген
+		for _, c := range chartsSlice {
 			dumper.Plot(c)
-			c.Reset()
-		}
-		for _, c := range charts2 {
-			dumper2.Plot(c)
 			c.Reset()
 		}
 	}
@@ -459,6 +380,139 @@ func (a app) stage2() {
 		plStat.creatorsIncIP,
 		plStat.rocketInc,
 	)
+}
+
+// Круговая диаграмма создателей опросов
+func (a app) stage3() {
+	type poll struct {
+		idNick string
+		n      int
+	}
+
+	var (
+		err                   error
+		strFileP, strFileIP   string
+		strSplitP, strSplitIP []string
+		polls                 []poll
+		ipolls                []poll
+
+		colors2 = []string{"#F44336", "#E91E63", "#9C27B0", "#673AB7", "#3F51B5", "#2196F3", "#00BCD4", "#009688", "#4CAF50", "#8BC34A", "#CDDC39", "#FFEB3B", "#FFC107", "#FF9800", "#FF5722", "#9E9E9E"}
+
+		sumTop, sumAll int
+		dataC6         = make([]opts.PieData, 0)
+		dataC7         = make([]opts.PieData, 0)
+	)
+
+	//чтение файлов и преобразование
+	page := components.NewPage()
+	f2, err := os.Create(a.cfg.dir + "Polls/CreatorsChart.html")
+	pnc(err)
+
+	strFileP = a.readFile("Polls/PollsCreators.txt")
+	strSplitP = strings.Split(strFileP, "\n")
+	strSplitP = strSplitP[:len(strSplitP)-1]
+	polls = make([]poll, 0, len(strSplitP))
+
+	strFileIP = a.readFile("Polls/IPollsCreators.txt")
+	strSplitIP = strings.Split(strFileIP, "\n")
+	strSplitIP = strSplitIP[:len(strSplitIP)-1]
+	ipolls = make([]poll, 0, len(strSplitIP))
+
+	for _, str := range strSplitP {
+		poll := poll{idNick: str[4:]}
+
+		poll.n, err = strconv.Atoi(strings.Replace(str[:3], " ", "", -1))
+		pnc(err, str)
+
+		polls = append(polls, poll)
+	}
+
+	for _, str := range strSplitIP {
+		poll := poll{idNick: str[4:]}
+
+		poll.n, err = strconv.Atoi(strings.Replace(str[:3], " ", "", -1))
+		pnc(err, str)
+
+		ipolls = append(ipolls, poll)
+	}
+
+	//топ создателей опросов
+	c6 := charts.NewPie()
+	c6.SetGlobalOptions(charts.WithTitleOpts(opts.Title{
+		Title: "Топ 10 создателей опросов",
+	}))
+	sumTop, sumAll = 0, 0
+	for i, v := range polls {
+		if i < 10 {
+			dataC6 = append(dataC6, opts.PieData{
+				Name:  v.idNick,
+				Value: v.n,
+				ItemStyle: &opts.ItemStyle{
+					Color: colors2[i],
+				},
+			})
+			sumTop += v.n
+		}
+		sumAll += v.n
+	}
+	dataC6 = append(dataC6, opts.PieData{
+		Name:  "Остальные",
+		Value: sumAll - sumTop,
+		ItemStyle: &opts.ItemStyle{
+			Color: colors2[15],
+		},
+	})
+	c6.AddSeries("Создатели", dataC6).
+		SetSeriesOptions(
+			charts.WithLabelOpts(opts.Label{
+				Show:      true,
+				Formatter: "{b}: {c}",
+			}),
+			charts.WithPieChartOpts(opts.PieChart{
+				Radius: []string{"40%", "75%"},
+			}),
+		)
+
+	//топ создателей инлайн опросов
+	c7 := charts.NewPie()
+	c7.SetGlobalOptions(charts.WithTitleOpts(opts.Title{
+		Title: "Топ 15 создателей инлайн опросов",
+	}))
+	sumTop, sumAll = 0, 0
+	for i, v := range ipolls {
+		if i < 15 {
+			dataC7 = append(dataC7, opts.PieData{
+				Name:  v.idNick,
+				Value: v.n,
+				ItemStyle: &opts.ItemStyle{
+					Color: colors2[i],
+				},
+			})
+			sumTop += v.n
+		}
+		sumAll += v.n
+	}
+	dataC7 = append(dataC7, opts.PieData{
+		Name:  "Остальные",
+		Value: sumAll - sumTop,
+		ItemStyle: &opts.ItemStyle{
+			Color: colors2[15],
+		},
+	})
+	c7.AddSeries("Создатели", dataC7).
+		SetSeriesOptions(
+			charts.WithLabelOpts(opts.Label{
+				Show:      true,
+				Formatter: "{b}: {c}",
+			}),
+			charts.WithPieChartOpts(opts.PieChart{
+				Radius: []string{"40%", "75%"},
+			}),
+		)
+
+	//создание страницы
+	page.AddCharts(c6, c7)
+	page.Render(io.MultiWriter(f2))
 }
 
 //анализ слов

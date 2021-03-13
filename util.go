@@ -44,8 +44,11 @@ func NewCFG() (cfg cfg) {
 	return
 }
 
-func pnc(err error) {
+func pnc(err error, out ...string) {
 	if err != nil {
+		if len(out) > 0 {
+			fmt.Printf("\n\n %v", strings.Join(out, "\n"))
+		}
 		panic(err)
 	}
 }
@@ -157,38 +160,6 @@ func mapNickTransformation(mp map[string]int) map[string]int {
 		if bl {
 			for k, v := range mp2 {
 				mp[k] = v
-			}
-		}
-	}
-
-	//Костыль от дырыча на опросы 🙄🙄🙄🙄🙄🙄🙄
-	if true {
-		brk := false
-		for k1, v1 := range mp {
-			if brk {
-				break
-			}
-
-			id1 = k1[:strings.Index(k1, " ")]
-			nick1 = k1[strings.Index(k1, " ")+1:]
-
-			if id1 == "#VQ" {
-				for k2, v2 := range mp {
-					if brk {
-						break
-					}
-
-					id2 = k2[:strings.Index(k2, " ")]
-					nick2 = k2[strings.Index(k2, " ")+1:]
-
-					if id2 == "#ohyoutouchmytralala" {
-						mp[id1+" "+nick1+"/"+nick2] = v1 + v2
-						delete(mp, k1)
-						delete(mp, k2)
-
-						brk = true
-					}
-				}
 			}
 		}
 	}
