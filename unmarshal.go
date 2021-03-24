@@ -15,6 +15,7 @@ type message struct {
 	FromID    int64
 	ReplyToID int64
 	Text      string
+	Hashtags  []string
 }
 
 //TODO дополнить message параметрами в будущем
@@ -80,6 +81,7 @@ func unmarshalJson(str string) message {
 		FromID:    int64(msgRaw.FromID),
 		ReplyToID: int64(msgRaw.ReplyToID),
 		Text:      "",
+		Hashtags:  make([]string, 0),
 	}
 
 	msg.Date, err = time.Parse("2006-01-02T15:04:05", msgRaw.Date)
@@ -102,6 +104,11 @@ func unmarshalJson(str string) message {
 					msg.Text += msgRaw.Text.([]interface{})[i].(map[string]interface{})["text"].(string)
 				} else {
 					panic(errors.New("msgRaw.Text type error"))
+				}
+				if _, ok = msgRaw.Text.([]interface{})[i].(map[string]interface{})["type"].(string); ok {
+					if msgRaw.Text.([]interface{})[i].(map[string]interface{})["type"].(string) == "hashtag" {
+						msg.Hashtags = append(msg.Hashtags, msgRaw.Text.([]interface{})[i].(map[string]interface{})["text"].(string))
+					}
 				}
 			}
 		}
