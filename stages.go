@@ -515,6 +515,100 @@ func (a app) stage3() {
 	page.Render(io.MultiWriter(f2))
 }
 
+// Обработка недовольств
+func (a app) stage4() {
+	file1 := a.createFileNTrunc("Tags/Недовольства.txt")
+	defer file1.Close()
+
+	for msg := range a.unmarshalChan() {
+		for _, hashtag := range msg.Hashtags {
+			if hashtag == "#недовольство" || hashtag == "#Недовольство" {
+				file1.WriteString(msg.Date.Format(time.RFC3339) + "\n")
+			}
+		}
+	}
+}
+
+// График недовольств
+func (a app) stage5() {
+	var (
+		speedTags = make([]time.Time, 0)
+		XAxis     = make([]string, 0)
+		data      = make([]opts.LineData, 0)
+		dataMap   = make(map[string]int)
+	)
+
+	strFile := a.readFile("Tags/Недовольства.txt")
+	strSplit := strings.Split(strFile, "\n")
+	for _, str := range strSplit[:len(strSplit)-1] {
+		tm, err := time.Parse(time.RFC3339, str)
+		pnc(err)
+		speedTags = append(speedTags, tm)
+	}
+
+	page := components.NewPage()
+	f1, err := os.Create(a.cfg.dir + "Tags/Недовольства.html")
+	pnc(err)
+
+	quarterYear := func(month time.Month) int {
+		switch {
+		case 1 <= month && month <= 3:
+			return 1
+		case 4 <= month && month <= 6:
+			return 2
+		case 7 <= month && month <= 9:
+			return 3
+		case 10 <= month && month <= 12:
+			return 4
+		}
+		return 0
+	}
+
+	quarterYearStr := func(y int, m time.Month) string {
+		return strconv.Itoa(y)[2:] + "Q" + strconv.Itoa(quarterYear(m))
+	}
+
+	y, m, _ := speedTags[0].Date()
+	XAxis = append(XAxis, quarterYearStr(y, m))
+	for _, tag := range speedTags {
+		yTag, mTag, _ := tag.Date()
+		for y < yTag || quarterYear(m) < quarterYear(mTag) {
+			m += 3
+			if m > 12 {
+				y++
+				m -= 12
+			}
+			XAxis = append(XAxis, quarterYearStr(y, m))
+		}
+		dataMap[quarterYearStr(y, m)]++
+	}
+
+	for _, x := range XAxis {
+		data = append(data, opts.LineData{Value: dataMap[x]})
+	}
+
+	c1 := charts.NewLine()
+	c1.SetGlobalOptions(charts.WithTitleOpts(opts.Title{
+		Title: "График недовольств",
+	}))
+	c1.SetXAxis(XAxis).AddSeries("", data).
+		SetSeriesOptions(
+			charts.WithLabelOpts(opts.Label{
+				Show: true,
+			}),
+			charts.WithAreaStyleOpts(opts.AreaStyle{
+				Opacity: 0.2,
+			}),
+			charts.WithLineChartOpts(opts.LineChart{
+				Smooth: true,
+			}),
+		)
+
+	//создание страницы
+	page.AddCharts(c1)
+	page.Render(io.MultiWriter(f1))
+}
+
 //анализ слов
 /*
 //анализ слов
